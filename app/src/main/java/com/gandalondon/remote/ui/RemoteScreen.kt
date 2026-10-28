@@ -205,6 +205,7 @@ private fun InputTile(
 }
 
 /** On: solid ink, like the selected input. Off: grey. In between: a spinner. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PowerButton(power: Power, onClick: () -> Unit, modifier: Modifier) {
     val view = LocalView.current
