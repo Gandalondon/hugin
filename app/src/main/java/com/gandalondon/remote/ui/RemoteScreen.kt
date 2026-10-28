@@ -202,14 +202,15 @@ private fun InputTile(
 /** Four across on a 412dp-wide phone makes each tile about 85dp wide: 88dp tall keeps them square. */
 private val TileHeight = 88.dp
 
-/** On: solid ink, like the selected input. Off: grey. In between: a spinner. */
+/** Grey at rest (the dimmed controls show when the TV is off). Black with a spinner while switching. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PowerButton(power: Power, onClick: () -> Unit, modifier: Modifier) {
     val view = LocalView.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val solid = power == Power.On || power == Power.TurningOff
+    // Grey at rest so it never competes with the selected input; black only while switching.
+    val solid = power == Power.TurningOn || power == Power.TurningOff
     val bg = when {
         solid && pressed -> InkPressed
         solid -> Ink
