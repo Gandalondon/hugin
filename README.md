@@ -1,10 +1,10 @@
-# TV Remote
+# Hugin
 
 A minimal Android remote for an LG OLED65C14LB (C1, webOS 6). Two volume buttons and three inputs: Live TV, Google OTT and PS5. Nothing else.
 
 ## Install on the Pixel
 
-1. On the Pixel, open the latest release of this repo and tap `TV-Remote.apk`.
+1. On the Pixel, open the latest release of this repo and tap `Hugin.apk`.
 2. When Chrome asks, allow it to install unknown apps (Settings opens; switch on "Allow from this source", then go back).
 3. Tap Install. Play Protect may warn that it does not recognise the developer: choose "Install anyway".
 
@@ -14,7 +14,7 @@ Later builds install over the top and keep the pairing.
 
 1. TV: All Settings > General (or Connection) > Mobile Connection Management > LG Connect Apps: On. If the menu differs, search the TV's settings for "LG Connect Apps".
 2. Phone and TV on the same Wi-Fi.
-3. Open TV Remote. The TV appears under "Find your TV"; tap it. If it does not appear, type the TV's IP address (TV: Settings > Network > Wi-Fi > Advanced).
+3. Open Hugin. The TV appears under "Find your TV"; tap it. If it does not appear, type the TV's IP address (TV: Settings > Network > Wi-Fi > Advanced).
 4. The TV shows a prompt: choose Accept with the LG remote.
 
 Done. The app reconnects by itself from then on.

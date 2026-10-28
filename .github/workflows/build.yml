@@ -41,12 +41,12 @@ jobs:
         run: gradle :app:assembleRelease --no-daemon --stacktrace
 
       - name: Name the APK
-        run: cp app/build/outputs/apk/release/app-release.apk TV-Remote.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Hugin.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: TV Remote ${{ github.run_number }}
+          name: Hugin ${{ github.run_number }}
           make_latest: true
-          files: TV-Remote.apk
+          files: Hugin.apk
