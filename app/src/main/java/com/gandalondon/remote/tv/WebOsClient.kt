@@ -57,6 +57,10 @@ class WebOsClient(private val store: Store) {
     private val _inputs = MutableStateFlow<List<ExternalInput>?>(null)
     val inputs: StateFlow<List<ExternalInput>?> = _inputs
 
+    /** The TV's own power state, e.g. "Active", "Active Standby", "Screen Off". Null if not reported. */
+    private val _powerState = MutableStateFlow<String?>(null)
+    val powerState: StateFlow<String?> = _powerState
+
     private var socket: WebSocket? = null
     private val ids = AtomicInteger(1)
     private val pending = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
@@ -135,6 +139,7 @@ class WebOsClient(private val store: Store) {
 
     private fun dropped() {
         socket = null
+        _powerState.value = null
         pending.values.forEach { it.completeExceptionally(TvException("Connection lost")) }
         pending.clear()
         subscriptions.clear()
@@ -198,14 +203,29 @@ class WebOsClient(private val store: Store) {
         subscribe(ws, "tv/getExternalInputList") { p ->
             p.optJSONArray("devices")?.let { _inputs.value = parseInputs(it) }
         }
+        subscribe(ws, "com.webos.service.tvpower/power/getPowerState") { p ->
+            if (p.has("state")) _powerState.value = p.optString("state")
+        }
+        // Save the TV's network card addresses: a TV that is fully off can
+        // only be woken by a Wake-on-LAN packet sent to one of them.
+        subscribe(ws, "com.webos.service.connectionmanager/getinfo", oneShot = true) { p ->
+            val macs = listOf("wiredInfo", "wifiInfo").mapNotNull { key ->
+                p.optJSONObject(key)?.optString("macAddress")?.takeIf { it.count { c -> c == ':' } == 5 }
+            }
+            if (macs.isNotEmpty()) store.macs = macs
+        }
     }
 
-    private fun subscribe(ws: WebSocket, uri: String, callback: (JSONObject) -> Unit) {
+    private fun subscribe(
+        ws: WebSocket,
+        uri: String,
+        oneShot: Boolean = false,
+        callback: (JSONObject) -> Unit,
+    ) {
         val id = "sub_${ids.getAndIncrement()}"
         subscriptions[id] = callback
-        ws.send(
-            JSONObject().put("type", "subscribe").put("id", id).put("uri", "ssap://$uri").toString()
-        )
+        val type = if (oneShot) "request" else "subscribe"
+        ws.send(JSONObject().put("type", type).put("id", id).put("uri", "ssap://$uri").toString())
     }
 
     private fun parseVolume(p: JSONObject): Int? {
@@ -229,6 +249,24 @@ class WebOsClient(private val store: Store) {
     // endregion
 
     // region commands
+
+    /** Turn off. Sent without waiting: the TV often shuts down before it replies. */
+    fun powerOff(): Boolean {
+        val ws = socket ?: return false
+        if (_conn.value != Conn.Connected) return false
+        val msg = JSONObject().put("type", "request").put("id", "req_${ids.getAndIncrement()}")
+            .put("uri", "ssap://system/turnOff")
+        return ws.send(msg.toString())
+    }
+
+    /**
+     * Wake a TV that is still connected: picture switched off, or in the
+     * network standby that Quick Start+ keeps alive. Fully off needs Wake-on-LAN.
+     */
+    suspend fun powerOnConnected() {
+        if (_powerState.value == "Screen Off") request("com.webos.service.tvpower/power/turnOnScreen")
+        else request("system/turnOn")
+    }
 
     suspend fun volumeUp() = request("audio/volumeUp")
     suspend fun volumeDown() = request("audio/volumeDown")

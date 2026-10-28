@@ -12,6 +12,7 @@ import com.gandalondon.remote.tv.Target
 import com.gandalondon.remote.tv.WebOsClient
 import com.gandalondon.remote.tv.discoverTvs
 import com.gandalondon.remote.tv.resolve
+import com.gandalondon.remote.tv.wakeOnLan
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+
+/** What the power button shows. */
+enum class Power { On, Off, Unknown, TurningOn, TurningOff }
 
 /** A short message under the input buttons, optionally with one action. */
 data class Notice(val text: String, val action: NoticeAction? = null)
@@ -60,6 +64,13 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     private val _searching = MutableStateFlow(false)
     val searching: StateFlow<Boolean> = _searching
 
+    private val _power = MutableStateFlow(Power.Unknown)
+    val power: StateFlow<Power> = _power
+
+    /** Set while a power change is in flight, so the button shows progress. */
+    private var pending: Power? = null
+    private var powerJob: Job? = null
+
     private var visible = false
     private var retryJob: Job? = null
     private var noticeJob: Job? = null
@@ -81,6 +92,96 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
                 }
+            }
+        }
+        viewModelScope.launch { client.conn.collect { updatePower() } }
+        viewModelScope.launch { client.powerState.collect { updatePower() } }
+    }
+
+    /** The TV's real state, or null while it is still unknown. */
+    private fun observedPower(): Power? {
+        val c = client.conn.value
+        return when {
+            c == Conn.Connected -> when (client.powerState.value) {
+                "Active Standby", "Suspend", "Power Off", "Screen Off" -> Power.Off
+                else -> Power.On
+            }
+            // Unreachable and we know how to wake it: treat as off, not lost.
+            c is Conn.Failed && c.reason == Reason.Unreachable ->
+                if (store.macs.isNotEmpty()) Power.Off else Power.Unknown
+            else -> null // connecting: keep showing the last state, no flicker
+        }
+    }
+
+    private fun updatePower() {
+        val seen = observedPower()
+        val target = pending
+        if (target != null) {
+            val done = (target == Power.TurningOn && seen == Power.On) ||
+                (target == Power.TurningOff && seen == Power.Off)
+            if (!done) { _power.value = target; return }
+            pending = null
+            powerJob?.cancel()
+        }
+        _power.value = seen ?: if (_power.value in setOf(Power.TurningOn, Power.TurningOff)) Power.Unknown else _power.value
+    }
+
+    fun togglePower() {
+        if (pending != null) return
+        when (_power.value) {
+            Power.On -> turnOff()
+            else -> turnOn()
+        }
+    }
+
+    private fun turnOff() {
+        if (!client.powerOff()) {
+            show(Notice("Not connected to the TV yet.", NoticeAction.Retry(::retryNow)))
+            return
+        }
+        _notice.value = null
+        pending = Power.TurningOff
+        updatePower()
+        powerJob = viewModelScope.launch {
+            delay(15_000)
+            if (pending == Power.TurningOff) {
+                pending = null
+                updatePower()
+                show(Notice("The TV did not turn off.", NoticeAction.Retry(::togglePower)))
+            }
+        }
+    }
+
+    private fun turnOn() {
+        val macs = store.macs
+        val connected = client.conn.value == Conn.Connected
+        if (!connected && macs.isEmpty()) {
+            show(Notice("Turn the TV on with its own remote once, so Hugin can learn to wake it."))
+            return
+        }
+        _notice.value = null
+        pending = Power.TurningOn
+        updatePower()
+        powerJob = viewModelScope.launch {
+            if (connected) runCatching { client.powerOnConnected() }
+            // Fully off: wake it, then keep knocking until it answers.
+            repeat(12) { i ->
+                if (pending != Power.TurningOn) return@launch
+                if (client.conn.value != Conn.Connected) {
+                    if (i % 3 == 0 && macs.isNotEmpty()) wakeOnLan(macs, _host.value)
+                    if (client.conn.value !is Conn.Connecting) retryNow()
+                }
+                delay(2_000)
+            }
+            if (pending == Power.TurningOn) {
+                pending = null
+                updatePower()
+                show(
+                    Notice(
+                        "The TV did not turn on. Check Turn on via Wi-Fi is on in the TV's settings.",
+                        NoticeAction.Retry(::togglePower),
+                    )
+                )
             }
         }
     }
@@ -149,9 +250,14 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     fun volumeUp() = command { client.volumeUp() }
     fun volumeDown() = command { client.volumeDown() }
 
+    private fun notConnected() {
+        if (_power.value == Power.Off) show(Notice("The TV is off."))
+        else show(Notice("Not connected to the TV yet.", NoticeAction.Retry(::retryNow)))
+    }
+
     private fun command(block: suspend () -> Unit) {
         if (conn.value != Conn.Connected) {
-            show(Notice("Not connected to the TV yet.", NoticeAction.Retry(::retryNow)))
+            notConnected()
             return
         }
         viewModelScope.launch {
@@ -163,7 +269,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
 
     fun select(target: Target, force: Boolean = false) {
         if (conn.value != Conn.Connected) {
-            show(Notice("Not connected to the TV yet.", NoticeAction.Retry(::retryNow)))
+            notConnected()
             return
         }
         val choice = choiceFor(target)

@@ -50,6 +50,7 @@ private fun App(vm: RemoteViewModel = viewModel()) {
     val overrides by vm.overrides.collectAsStateWithLifecycle()
     val foreground by vm.foregroundApp.collectAsStateWithLifecycle()
     val switching by vm.switching.collectAsStateWithLifecycle()
+    val power by vm.power.collectAsStateWithLifecycle()
     val notice by vm.notice.collectAsStateWithLifecycle()
     val found by vm.found.collectAsStateWithLifecycle()
     val searching by vm.searching.collectAsStateWithLifecycle()
@@ -104,6 +105,7 @@ private fun App(vm: RemoteViewModel = viewModel()) {
                     choices = choices,
                     switching = switching,
                     notice = notice,
+                    power = power,
                 ),
                 onSelect = vm::select,
                 onVolumeUp = vm::volumeUp,
@@ -116,6 +118,7 @@ private fun App(vm: RemoteViewModel = viewModel()) {
                     }
                 },
                 onSettings = { showSettings = true },
+                onPower = vm::togglePower,
             )
         }
     }

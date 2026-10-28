@@ -33,6 +33,11 @@ class Store(context: Context) {
         get() = prefs.getString("cert_pin", null)
         set(v) = prefs.edit().putString("cert_pin", v).apply()
 
+    /** The TV's network card addresses, for Wake-on-LAN. */
+    var macs: List<String>
+        get() = prefs.getString("macs", null)?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
+        set(v) = prefs.edit().putString("macs", v.joinToString(",")).apply()
+
     var clientKey: String?
         get() = prefs.getString("client_key", null)?.let { runCatching { Vault.decrypt(it) }.getOrNull() }
         set(v) = prefs.edit().putString("client_key", v?.let { Vault.encrypt(it) }).apply()

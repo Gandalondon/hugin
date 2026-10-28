@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -37,11 +38,14 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.gandalondon.remote.Notice
 import com.gandalondon.remote.NoticeAction
+import com.gandalondon.remote.Power
 import com.gandalondon.remote.tv.Choice
 import com.gandalondon.remote.tv.Conn
 import com.gandalondon.remote.tv.Reason
@@ -53,10 +57,11 @@ data class RemoteUi(
     val choices: Map<Target, Choice?>,
     val switching: Target?,
     val notice: Notice?,
+    val power: Power,
 )
 
 /**
- * Three input tiles and one volume rocker. Nothing else on screen.
+ * Power, three input tiles and one volume rocker. Nothing else on screen.
  * Settings open from a long-press on any input tile.
  */
 @Composable
@@ -68,8 +73,10 @@ fun RemoteScreen(
     onRetry: () -> Unit,
     onNoticeAction: (NoticeAction) -> Unit,
     onSettings: () -> Unit,
+    onPower: () -> Unit,
 ) {
-    val connected = ui.conn == Conn.Connected
+    // While the TV is off, the other controls dim so its state reads at a glance.
+    val tvOff = ui.power == Power.Off || ui.power == Power.TurningOn
     Column(
         Modifier
             .fillMaxSize()
@@ -77,13 +84,20 @@ fun RemoteScreen(
             .systemBarsPadding()
             .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 24.dp),
     ) {
+        // Power sits above the first input, on the same three-column grid.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PowerButton(ui.power, onPower, Modifier.weight(1f))
+            Spacer(Modifier.weight(2f))
+        }
+        Spacer(Modifier.height(8.dp))
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Target.entries.forEach { t ->
                 InputTile(
                     target = t,
                     selected = ui.current == t && ui.switching == null,
                     busy = ui.switching == t,
-                    missing = ui.choices[t]?.connected == false,
+                    missing = tvOff || ui.choices[t]?.connected == false,
                     onClick = { onSelect(t) },
                     onLongClick = onSettings,
                     modifier = Modifier.weight(1f),
@@ -97,6 +111,8 @@ fun RemoteScreen(
                 "The TV needs pairing again, usually after a TV update.",
                 NoticeAction.OpenSettings,
             )
+            // Off with a way to wake it: the power button already says so.
+            ui.conn is Conn.Failed && ui.power != Power.Unknown -> null
             ui.conn is Conn.Failed -> Notice("TV off or not found.", NoticeAction.Retry(onRetry))
             else -> null
         }
@@ -119,14 +135,14 @@ fun RemoteScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 container = Fog,
                 pressedContainer = FogPressed,
-            ) { Glyph(plus = true) }
+            ) { Glyph(plus = true, color = if (tvOff) Muted else Ink) }
             RepeatButton(
                 onStep = onVolumeDown,
                 description = "Volume down",
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 container = Fog,
                 pressedContainer = FogPressed,
-            ) { Glyph(plus = false) }
+            ) { Glyph(plus = false, color = if (tvOff) Muted else Ink) }
         }
     }
 }
@@ -188,6 +204,57 @@ private fun InputTile(
     }
 }
 
+/** On: solid ink, like the selected input. Off: grey. In between: a spinner. */
+@Composable
+private fun PowerButton(power: Power, onClick: () -> Unit, modifier: Modifier) {
+    val view = LocalView.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val solid = power == Power.On || power == Power.TurningOff
+    val bg = when {
+        solid && pressed -> InkPressed
+        solid -> Ink
+        pressed -> FogPressed
+        else -> Fog
+    }
+    val fg = if (solid) Paper else Ink
+    val state = when (power) {
+        Power.On -> "TV on"
+        Power.Off -> "TV off"
+        Power.TurningOn -> "Turning on"
+        Power.TurningOff -> "Turning off"
+        Power.Unknown -> "TV state unknown"
+    }
+    Box(
+        modifier
+            .height(64.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(bg)
+            .semantics {
+                contentDescription = "Power"
+                stateDescription = state
+                liveRegion = LiveRegionMode.Polite
+            }
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClickLabel = if (power == Power.On) "Turn TV off" else "Turn TV on",
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    onClick()
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (power == Power.TurningOn || power == Power.TurningOff) {
+            CircularProgressIndicator(color = fg, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+        } else {
+            Icon(PowerIcon, contentDescription = null, tint = fg, modifier = Modifier.size(32.dp))
+        }
+    }
+}
+
 @Composable
 private fun NoticeBar(notice: Notice, onAction: (NoticeAction) -> Unit) {
     Row(
@@ -206,10 +273,10 @@ private fun NoticeBar(notice: Notice, onAction: (NoticeAction) -> Unit) {
 
 /** Bold plus / minus drawn as flat bars. */
 @Composable
-private fun Glyph(plus: Boolean) {
+private fun Glyph(plus: Boolean, color: Color = Ink) {
     Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(width = 40.dp, height = 6.dp).background(Ink, RoundedCornerShape(3.dp)))
-        if (plus) Box(Modifier.size(width = 6.dp, height = 40.dp).background(Ink, RoundedCornerShape(3.dp)))
+        Box(Modifier.size(width = 40.dp, height = 6.dp).background(color, RoundedCornerShape(3.dp)))
+        if (plus) Box(Modifier.size(width = 6.dp, height = 40.dp).background(color, RoundedCornerShape(3.dp)))
     }
 }
 
@@ -253,3 +320,17 @@ private fun iconFor(t: Target) = when (t) {
     Target.CAST -> CastIcon
     Target.PS5 -> GamepadIcon
 }
+
+// Material "power_settings_new", filled, 24-unit grid.
+private val PowerIcon = ImageVector.Builder("power", 24.dp, 24.dp, 24f, 24f).apply {
+    addPath(
+        pathData = addPathNodes(
+            "M13,3h-2v10h2V3z" +
+                "M17.83,5.17l-1.42,1.42C17.99,7.86 19,9.81 19,12c0,3.87 -3.13,7 -7,7s-7,-3.13 -7,-7" +
+                "c0,-2.19 1.01,-4.14 2.58,-5.42L6.17,5.17C4.23,6.82 3,9.26 3,12c0,4.97 4.03,9 9,9" +
+                "s9,-4.03 9,-9c0,-2.74 -1.23,-5.18 -3.17,-6.83z"
+        ),
+        fill = SolidColor(Color.Black),
+        pathFillType = PathFillType.NonZero,
+    )
+}.build()
