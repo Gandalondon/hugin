@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bold white TV outline on near-black, inside the 66dp adaptive-icon safe zone. -->
+<!-- Bold near-black TV outline on white, inside the 66dp adaptive-icon safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#FF1A1A1A"
         android:fillType="evenOdd"
         android:pathData="M40,38 L68,38 A6,6 0 0 1 74,44 L74,64 A6,6 0 0 1 68,70 L40,70 A6,6 0 0 1 34,64 L34,44 A6,6 0 0 1 40,38 Z
             M41,43 L67,43 A2,2 0 0 1 69,45 L69,63 A2,2 0 0 1 67,65 L41,65 A2,2 0 0 1 39,63 L39,45 A2,2 0 0 1 41,43 Z" />
