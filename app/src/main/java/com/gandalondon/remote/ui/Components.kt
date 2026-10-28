@@ -77,6 +77,8 @@ fun RepeatButton(
     onStep: () -> Unit,
     description: String,
     modifier: Modifier = Modifier,
+    container: Color = Ink,
+    pressedContainer: Color = InkPressed,
     content: @Composable () -> Unit,
 ) {
     val view = LocalView.current
@@ -85,8 +87,7 @@ fun RepeatButton(
     var pressed by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(32.dp))
-            .background(if (pressed) InkPressed else Ink)
+            .background(if (pressed) pressedContainer else container)
             .semantics {
                 role = Role.Button
                 contentDescription = description

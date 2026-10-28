@@ -49,7 +49,6 @@ private fun App(vm: RemoteViewModel = viewModel()) {
     val inputs by vm.inputs.collectAsStateWithLifecycle()
     val overrides by vm.overrides.collectAsStateWithLifecycle()
     val foreground by vm.foregroundApp.collectAsStateWithLifecycle()
-    val volume by vm.volume.collectAsStateWithLifecycle()
     val switching by vm.switching.collectAsStateWithLifecycle()
     val notice by vm.notice.collectAsStateWithLifecycle()
     val found by vm.found.collectAsStateWithLifecycle()
@@ -98,19 +97,13 @@ private fun App(vm: RemoteViewModel = viewModel()) {
                 val c = choices[t]
                 c != null && foreground != null && c.appId == foreground
             }
-            val certChanged = failure?.reason == Reason.CertificateChanged
             RemoteScreen(
                 ui = RemoteUi(
                     conn = conn,
-                    tvName = tvName ?: "LG TV",
                     current = current,
                     choices = choices,
                     switching = switching,
-                    volume = volume,
-                    notice = if (certChanged) Notice(
-                        "The TV's security certificate changed, possibly after an update. Pair again to continue.",
-                        NoticeAction.OpenSettings,
-                    ) else notice,
+                    notice = notice,
                 ),
                 onSelect = vm::select,
                 onVolumeUp = vm::volumeUp,
