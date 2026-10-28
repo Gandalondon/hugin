@@ -84,14 +84,9 @@ fun RemoteScreen(
             .systemBarsPadding()
             .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 24.dp),
     ) {
-        // Power sits above the first input, on the same three-column grid.
+        // One row of four: power first, then the three inputs.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PowerButton(ui.power, onPower, Modifier.weight(1f))
-            Spacer(Modifier.weight(2f))
-        }
-        Spacer(Modifier.height(8.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Target.entries.forEach { t ->
                 InputTile(
                     target = t,
@@ -175,7 +170,7 @@ private fun InputTile(
     }
     Box(
         modifier
-            .height(112.dp)
+            .height(TileHeight)
             .clip(RoundedCornerShape(24.dp))
             .background(bg)
             .semantics { this.selected = selected }
@@ -199,10 +194,13 @@ private fun InputTile(
         if (busy) {
             CircularProgressIndicator(color = Paper, strokeWidth = 3.dp, modifier = Modifier.size(32.dp))
         } else {
-            Icon(iconFor(target), contentDescription = target.label, tint = fg, modifier = Modifier.size(40.dp))
+            Icon(iconFor(target), contentDescription = target.label, tint = fg, modifier = Modifier.size(36.dp))
         }
     }
 }
+
+/** Four across on a 412dp-wide phone makes each tile about 85dp wide: 88dp tall keeps them square. */
+private val TileHeight = 88.dp
 
 /** On: solid ink, like the selected input. Off: grey. In between: a spinner. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -228,7 +226,7 @@ private fun PowerButton(power: Power, onClick: () -> Unit, modifier: Modifier) {
     }
     Box(
         modifier
-            .height(64.dp)
+            .height(TileHeight)
             .clip(RoundedCornerShape(24.dp))
             .background(bg)
             .semantics {
@@ -251,7 +249,7 @@ private fun PowerButton(power: Power, onClick: () -> Unit, modifier: Modifier) {
         if (power == Power.TurningOn || power == Power.TurningOff) {
             CircularProgressIndicator(color = fg, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
         } else {
-            Icon(PowerIcon, contentDescription = null, tint = fg, modifier = Modifier.size(32.dp))
+            Icon(PowerIcon, contentDescription = null, tint = fg, modifier = Modifier.size(36.dp))
         }
     }
 }

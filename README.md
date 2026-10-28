@@ -21,7 +21,7 @@ Done. The app reconnects by itself from then on.
 
 ## Power
 
-The power button sits above the first input. Black means the TV is on, grey means off; the other controls dim while it is off.
+The power button is the first of the four tiles in the top row. Black means the TV is on, grey means off; the other controls dim while it is off.
 
 Turning off works out of the box. Turning on a TV that is fully off uses Wake-on-LAN, so on the TV switch on **Turn on via Wi-Fi** (on webOS 6: All Settings > General > Devices > External Devices, or search settings for "Turn on via Wi-Fi"). Hugin learns the TV's network address the first time it connects while the TV is on.
 
