@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The TV only speaks to the local network. Plain ws:// on port 3000 is a
+     fallback for older firmware; wss:// on 3001 is tried first. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
