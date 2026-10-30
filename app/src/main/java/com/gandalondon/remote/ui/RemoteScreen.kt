@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
@@ -130,14 +131,14 @@ fun RemoteScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 container = Fog,
                 pressedContainer = FogPressed,
-            ) { Glyph(plus = true, color = if (tvOff) Muted else Ink) }
+            ) { Icon(PlusIcon, contentDescription = null, tint = if (tvOff) Muted else Ink, modifier = Modifier.size(36.dp)) }
             RepeatButton(
                 onStep = onVolumeDown,
                 description = "Volume down",
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 container = Fog,
                 pressedContainer = FogPressed,
-            ) { Glyph(plus = false, color = if (tvOff) Muted else Ink) }
+            ) { Icon(MinusIcon, contentDescription = null, tint = if (tvOff) Muted else Ink, modifier = Modifier.size(36.dp)) }
         }
     }
 }
@@ -271,17 +272,13 @@ private fun NoticeBar(notice: Notice, onAction: (NoticeAction) -> Unit) {
     }
 }
 
-/** Bold plus / minus drawn as flat bars. */
-@Composable
-private fun Glyph(plus: Boolean, color: Color = Ink) {
-    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(width = 40.dp, height = 6.dp).background(color, RoundedCornerShape(3.dp)))
-        if (plus) Box(Modifier.size(width = 6.dp, height = 40.dp).background(color, RoundedCornerShape(3.dp)))
-    }
-}
-
 // Line icons in the Material style, 24-unit grid, 2-unit stroke.
-private fun lineIcon(name: String, vararg paths: String, join: StrokeJoin = StrokeJoin.Round): ImageVector =
+private fun lineIcon(
+    name: String,
+    vararg paths: String,
+    join: StrokeJoin = StrokeJoin.Round,
+    cap: StrokeCap = StrokeCap.Butt,
+): ImageVector =
     ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
         paths.forEach {
             addPath(
@@ -290,6 +287,7 @@ private fun lineIcon(name: String, vararg paths: String, join: StrokeJoin = Stro
                 stroke = SolidColor(Color.Black),
                 strokeLineWidth = 2f,
                 strokeLineJoin = join,
+                strokeLineCap = cap,
             )
         }
     }.build()
@@ -314,6 +312,10 @@ private val GamepadIcon = lineIcon(
     "M21,10h-4l-2,2l2,2h4z",
     join = StrokeJoin.Miter,
 )
+
+// Volume: same 36dp box, 2-unit stroke and width as the input icons.
+private val PlusIcon = lineIcon("plus", "M12,4v16", "M4,12h16", cap = StrokeCap.Round)
+private val MinusIcon = lineIcon("minus", "M4,12h16", cap = StrokeCap.Round)
 
 private fun iconFor(t: Target) = when (t) {
     Target.LIVE_TV -> TvIcon
