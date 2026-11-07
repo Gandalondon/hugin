@@ -315,13 +315,14 @@ private val CastIcon = lineIcon(
     "M3,17a2,2 0 0 1 2,2",
 )
 
+// Simple controller: same height and width as the TV and cast icons.
+// The thumbsticks are tiny circles stroked at 2, which draws them as solid dots.
 private val GamepadIcon = lineIcon(
     "gamepad",
-    "M10,3h4v4l-2,2l-2,-2z",
-    "M10,21h4v-4l-2,-2l-2,2z",
-    "M3,10h4l2,2l-2,2H3z",
-    "M21,10h-4l-2,2l2,2h4z",
-    join = StrokeJoin.Miter,
+    "M7,5.5h10c3.1,0 5,3.2 5,7.2c0,3.7 -1.6,6.3 -3.8,6.3c-1.8,0 -2.8,-1.8 -4,-3.5h-4.4" +
+        "c-1.2,1.7 -2.2,3.5 -4,3.5c-2.2,0 -3.8,-2.6 -3.8,-6.3c0,-4 1.9,-7.2 5,-7.2z",
+    "M7.6,11a0.4,0.4 0 1,0 0.8,0a0.4,0.4 0 1,0 -0.8,0z",
+    "M15.6,11a0.4,0.4 0 1,0 0.8,0a0.4,0.4 0 1,0 -0.8,0z",
 )
 
 // Volume: same 36dp box, 2-unit stroke and width as the input icons.
