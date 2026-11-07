@@ -51,6 +51,9 @@ class WebOsClient(private val store: Store) {
     private val _volume = MutableStateFlow<Int?>(null)
     val volume: StateFlow<Int?> = _volume
 
+    private val _muted = MutableStateFlow(false)
+    val muted: StateFlow<Boolean> = _muted
+
     private val _foregroundApp = MutableStateFlow<String?>(null)
     val foregroundApp: StateFlow<String?> = _foregroundApp
 
@@ -222,7 +225,10 @@ class WebOsClient(private val store: Store) {
     // region state
 
     private fun subscribeState(ws: WebSocket) {
-        subscribe(ws, "audio/getVolume") { p -> parseVolume(p)?.let { _volume.value = it } }
+        subscribe(ws, "audio/getVolume") { p ->
+            parseVolume(p)?.let { _volume.value = it }
+            parseMuted(p)?.let { _muted.value = it }
+        }
         subscribe(ws, "com.webos.applicationManager/getForegroundAppInfo") { p ->
             if (p.has("appId")) _foregroundApp.value = p.optString("appId")
         }
@@ -252,6 +258,14 @@ class WebOsClient(private val store: Store) {
         subscriptions[id] = callback
         val type = if (oneShot) "request" else "subscribe"
         ws.send(JSONObject().put("type", type).put("id", id).put("uri", "ssap://$uri").toString())
+    }
+
+    /** webOS 5+ nests it as volumeStatus.muteStatus; older firmware sends "muted". */
+    private fun parseMuted(p: JSONObject): Boolean? {
+        p.optJSONObject("volumeStatus")?.let { if (it.has("muteStatus")) return it.optBoolean("muteStatus") }
+        if (p.has("muted")) return p.optBoolean("muted")
+        if (p.has("mute")) return p.optBoolean("mute")
+        return null
     }
 
     private fun parseVolume(p: JSONObject): Int? {
@@ -296,6 +310,11 @@ class WebOsClient(private val store: Store) {
 
     suspend fun volumeUp() = request("audio/volumeUp")
     suspend fun volumeDown() = request("audio/volumeDown")
+
+    suspend fun setMute(mute: Boolean) {
+        request("audio/setMute", JSONObject().put("mute", mute))
+        _muted.value = mute // the subscription confirms; this keeps the button instant
+    }
 
     suspend fun switchTo(choice: Choice) {
         if (choice.inputId == LIVE_TV_ID) {

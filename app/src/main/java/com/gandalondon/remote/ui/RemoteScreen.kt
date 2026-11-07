@@ -59,6 +59,7 @@ data class RemoteUi(
     val switching: Target?,
     val notice: Notice?,
     val power: Power,
+    val muted: Boolean = false,
 )
 
 /**
@@ -71,6 +72,7 @@ fun RemoteScreen(
     onSelect: (Target) -> Unit,
     onVolumeUp: () -> Unit,
     onVolumeDown: () -> Unit,
+    onMute: () -> Unit,
     onRetry: () -> Unit,
     onNoticeAction: (NoticeAction) -> Unit,
     onSettings: () -> Unit,
@@ -127,18 +129,27 @@ fun RemoteScreen(
         ) {
             RepeatButton(
                 onStep = onVolumeUp,
-                description = "Volume up",
+                description = if (ui.muted) "Unmute" else "Volume up",
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 container = Fog,
                 pressedContainer = FogPressed,
             ) { Icon(PlusIcon, contentDescription = null, tint = if (tvOff) Muted else Ink, modifier = Modifier.size(36.dp)) }
             RepeatButton(
                 onStep = onVolumeDown,
-                description = "Volume down",
+                description = if (ui.muted) "Muted. Tap plus to unmute" else "Volume down. Hold to mute",
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 container = Fog,
                 pressedContainer = FogPressed,
-            ) { Icon(MinusIcon, contentDescription = null, tint = if (tvOff) Muted else Ink, modifier = Modifier.size(36.dp)) }
+                onLongPress = onMute,
+            ) {
+                // While muted the minus becomes the muted speaker, so the state is never hidden.
+                Icon(
+                    if (ui.muted && !tvOff) MutedIcon else MinusIcon,
+                    contentDescription = null,
+                    tint = if (tvOff) Muted else Ink,
+                    modifier = Modifier.size(36.dp),
+                )
+            }
         }
     }
 }
@@ -316,6 +327,7 @@ private val GamepadIcon = lineIcon(
 // Volume: same 36dp box, 2-unit stroke and width as the input icons.
 private val PlusIcon = lineIcon("plus", "M12,4v16", "M4,12h16", cap = StrokeCap.Round)
 private val MinusIcon = lineIcon("minus", "M4,12h16", cap = StrokeCap.Round)
+private val MutedIcon = lineIcon("muted", "M4,9h4l5,-4v14l-5,-4h-4z", "M16,9l5,6", "M21,9l-5,6", cap = StrokeCap.Round)
 
 private fun iconFor(t: Target) = when (t) {
     Target.LIVE_TV -> TvIcon

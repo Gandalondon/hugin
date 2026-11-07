@@ -40,3 +40,7 @@ The app reads the TV's own input names and matches them: "PS5" or "PlayStation" 
 
 Hugin remembers every address the TV has answered at and tries them all. When the phone changes network it reconnects by itself, and if the TV is not at a known address it searches for the same TV (by its own ID) and connects without asking to pair again. This works as long as the phone can reach the TV from that network: if one network is a guest network or a separate router that cannot see the TV, nothing on the phone can get through.
 
+## Mute
+
+Hold minus to mute: the minus turns into a muted speaker. Tap plus to unmute (it does not change the volume). Tapping minus still turns it down; holding minus no longer repeats.
+

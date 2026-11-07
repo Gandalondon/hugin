@@ -43,6 +43,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
 
     val conn: StateFlow<Conn> = client.conn
     val volume = client.volume
+    val muted = client.muted
     val foregroundApp = client.foregroundApp
     val inputs = client.inputs
 
@@ -329,8 +330,12 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
 
     fun choiceFor(target: Target): Choice? = resolve(target, inputs.value, _overrides.value[target])
 
-    fun volumeUp() = command { client.volumeUp() }
+    /** While muted, a tap on plus only unmutes, so the volume does not jump. */
+    fun volumeUp() = command {
+        if (client.muted.value) client.setMute(false) else client.volumeUp()
+    }
     fun volumeDown() = command { client.volumeDown() }
+    fun mute() = command { client.setMute(true) }
 
     private fun notConnected() {
         if (_power.value == Power.Off) show(Notice("The TV is off."))

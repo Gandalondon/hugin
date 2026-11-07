@@ -51,6 +51,7 @@ private fun App(vm: RemoteViewModel = viewModel()) {
     val foreground by vm.foregroundApp.collectAsStateWithLifecycle()
     val switching by vm.switching.collectAsStateWithLifecycle()
     val power by vm.power.collectAsStateWithLifecycle()
+    val muted by vm.muted.collectAsStateWithLifecycle()
     val notice by vm.notice.collectAsStateWithLifecycle()
     val found by vm.found.collectAsStateWithLifecycle()
     val searching by vm.searching.collectAsStateWithLifecycle()
@@ -106,10 +107,12 @@ private fun App(vm: RemoteViewModel = viewModel()) {
                     switching = switching,
                     notice = notice,
                     power = power,
+                    muted = muted,
                 ),
                 onSelect = vm::select,
                 onVolumeUp = vm::volumeUp,
                 onVolumeDown = vm::volumeDown,
+                onMute = vm::mute,
                 onRetry = vm::retryNow,
                 onNoticeAction = { action ->
                     when (action) {

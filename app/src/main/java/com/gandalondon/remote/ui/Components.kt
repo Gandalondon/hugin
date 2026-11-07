@@ -79,11 +79,14 @@ fun RepeatButton(
     modifier: Modifier = Modifier,
     container: Color = Ink,
     pressedContainer: Color = InkPressed,
+    /** When set, holding fires this once instead of repeating, and a tap steps on release. */
+    onLongPress: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val step by rememberUpdatedState(onStep)
+    val longPress by rememberUpdatedState(onLongPress)
     var pressed by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
@@ -93,7 +96,27 @@ fun RepeatButton(
                 contentDescription = description
                 onClick { step(); true }
             }
-            .pointerInput(Unit) {
+            .pointerInput(onLongPress != null) {
+                if (onLongPress != null) {
+                    detectTapGestures(onPress = {
+                        pressed = true
+                        var held = false
+                        val hold = scope.launch {
+                            delay(500)
+                            held = true
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            longPress?.invoke()
+                        }
+                        val released = tryAwaitRelease()
+                        hold.cancel()
+                        pressed = false
+                        if (released && !held) {
+                            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            step()
+                        }
+                    })
+                    return@pointerInput
+                }
                 detectTapGestures(onPress = {
                     pressed = true
                     view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
