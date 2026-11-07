@@ -28,6 +28,27 @@ class Store(context: Context) {
         get() = prefs.getString("tv_name", null)
         set(v) = prefs.edit().putString("tv_name", v).apply()
 
+    /**
+     * Every address the TV has answered at, most recent first. With more
+     * than one Wi-Fi network at home the TV can sit at a different address
+     * depending on which one the phone is on.
+     */
+    var hosts: List<String>
+        get() = prefs.getString("hosts", null)?.split(',')?.filter { it.isNotBlank() }
+            ?: listOfNotNull(host)
+        set(v) = prefs.edit().putString("hosts", v.distinct().take(6).joinToString(",")).apply()
+
+    /** Remember an address the TV answered at, and make it the first to try. */
+    fun rememberHost(h: String) {
+        host = h
+        hosts = listOf(h) + hosts.filter { it != h }
+    }
+
+    /** The TV's own ID from network discovery, so the same TV is recognised on any network. */
+    var tvId: String?
+        get() = prefs.getString("tv_id", null)
+        set(v) = prefs.edit().putString("tv_id", v).apply()
+
     /** SHA-256 of the TV's TLS certificate, pinned on first pairing. */
     var certPin: String?
         get() = prefs.getString("cert_pin", null)

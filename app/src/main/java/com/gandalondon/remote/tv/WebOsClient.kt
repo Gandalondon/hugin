@@ -69,11 +69,30 @@ class WebOsClient(private val store: Store) {
     /** Increments on every connect/disconnect so late callbacks from an old socket are ignored. */
     @Volatile private var session = 0
 
-    fun connect(host: String) {
+    /** Tries each address in turn, stopping at the first that is this TV. */
+    fun connect(hosts: List<String>) {
         disconnect()
+        if (hosts.isEmpty()) return
         val gen = session
         _conn.value = Conn.Connecting
-        open(host, secure = true, gen)
+        candidates = hosts
+        sawPinMismatch = false
+        open(hosts.first(), secure = true, gen)
+    }
+
+    fun connect(host: String) = connect(listOf(host))
+
+    private var candidates: List<String> = emptyList()
+    @Volatile private var connectedHost: String? = null
+    private var sawPinMismatch = false
+
+    /** Move on to the next address, or give up if none are left. */
+    private fun next(host: String, gen: Int) {
+        val i = candidates.indexOf(host)
+        val nextHost = candidates.getOrNull(i + 1)
+        if (nextHost != null) open(nextHost, secure = true, gen)
+        else if (sawPinMismatch) _conn.value = Conn.Failed(Reason.CertificateChanged)
+        else dropped()
     }
 
     fun disconnect() {
@@ -108,6 +127,7 @@ class WebOsClient(private val store: Store) {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 if (gen != session) return webSocket.cancel()
                 opened = true
+                connectedHost = host
                 socket = webSocket
                 register(webSocket, pin)
             }
@@ -124,13 +144,18 @@ class WebOsClient(private val store: Store) {
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 if (gen != session) return
                 when {
-                    t.hasCause<PinMismatch>() ->
-                        _conn.value = Conn.Failed(Reason.CertificateChanged)
+                    // Something else at this address (likely another device on
+                    // the other network): not our TV, so try the next address.
+                    t.hasCause<PinMismatch>() -> {
+                        sawPinMismatch = true
+                        next(host, gen)
+                    }
                     // Older firmware only offers plain ws on 3000. Never fall
                     // back once a certificate is pinned: that would let an
                     // attacker downgrade the connection.
                     !opened && secure && store.certPin == null ->
                         open(host, secure = false, gen)
+                    !opened -> next(host, gen)
                     else -> dropped()
                 }
             }
@@ -171,6 +196,7 @@ class WebOsClient(private val store: Store) {
                 }
                 "registered" -> {
                     store.clientKey = payload.optString("client-key")
+                    connectedHost?.let { store.rememberHost(it) }
                     pin.seen?.let { if (store.certPin == null) store.certPin = it }
                     _conn.value = Conn.Connected
                     subscribeState(ws)

@@ -35,3 +35,8 @@ The app reads the TV's own input names and matches them: "PS5" or "PlayStation" 
 - Protocol details follow [aiowebostv](https://github.com/home-assistant-libs/aiowebostv), the maintained webOS library behind Home Assistant. There is no maintained Java/Kotlin library, so the small subset needed is implemented in `tv/WebOsClient.kt`.
 - The pairing key is encrypted with an Android Keystore key. The TV's certificate is pinned on first pairing so nothing else on the network can pose as the TV.
 - Builds run on GitHub Actions on every push to `main` and publish a signed APK as a release. The signing key is stored as the repo secrets `SIGNING_KEYSTORE_B64` and `SIGNING_PASSWORD`, never in the code, so every build is signed the same way and updates install over the top.
+
+## More than one Wi-Fi network
+
+Hugin remembers every address the TV has answered at and tries them all. When the phone changes network it reconnects by itself, and if the TV is not at a known address it searches for the same TV (by its own ID) and connects without asking to pair again. This works as long as the phone can reach the TV from that network: if one network is a guest network or a separate router that cannot see the TV, nothing on the phone can get through.
+

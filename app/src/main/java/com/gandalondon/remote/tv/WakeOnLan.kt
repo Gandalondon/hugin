@@ -12,14 +12,14 @@ import java.net.InetAddress
  * enabled in its settings. Sent several ways at once, as routers differ in
  * which they pass on.
  */
-suspend fun wakeOnLan(macs: List<String>, host: String?): Boolean = withContext(Dispatchers.IO) {
+suspend fun wakeOnLan(macs: List<String>, hosts: List<String>): Boolean = withContext(Dispatchers.IO) {
     val targets = buildList {
         add("255.255.255.255")
-        host?.let {
+        hosts.forEach {
             add(it)                                            // direct, if the router remembers it
             it.substringBeforeLast('.', "").takeIf { p -> p.isNotEmpty() }?.let { p -> add("$p.255") }
         }
-    }.mapNotNull { runCatching { InetAddress.getByName(it) }.getOrNull() }
+    }.distinct().mapNotNull { runCatching { InetAddress.getByName(it) }.getOrNull() }
 
     var sent = false
     runCatching {

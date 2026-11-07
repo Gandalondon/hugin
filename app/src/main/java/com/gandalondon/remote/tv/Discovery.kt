@@ -11,7 +11,7 @@ import java.net.InetAddress
 import java.net.SocketTimeoutException
 import java.net.URL
 
-data class FoundTv(val host: String, val name: String)
+data class FoundTv(val host: String, val name: String, val id: String? = null)
 
 /**
  * Finds LG webOS TVs on the Wi-Fi with an SSDP search for the TV's
@@ -25,6 +25,7 @@ suspend fun discoverTvs(context: Context, timeoutMs: Long = 3_000): List<FoundTv
             acquire()
         }
         val found = linkedMapOf<String, String?>() // host -> description URL
+        val ids = mutableMapOf<String, String>()   // host -> the TV's own uuid
         try {
             DatagramSocket().use { socket ->
                 socket.soTimeout = 500
@@ -52,12 +53,14 @@ suspend fun discoverTvs(context: Context, timeoutMs: Long = 3_000): List<FoundTv
                     val host = packet.address.hostAddress ?: continue
                     val location = Regex("""(?im)^location:\s*(\S+)""").find(text)?.groupValues?.get(1)
                     if (host !in found) found[host] = location
+                    Regex("""(?im)^usn:\s*uuid:([0-9a-f-]+)""").find(text)?.groupValues?.get(1)
+                        ?.let { ids[host] = it.lowercase() }
                 }
             }
         } finally {
             lock.release()
         }
-        found.map { (host, location) -> FoundTv(host, location?.let(::friendlyName) ?: "LG TV") }
+        found.map { (host, location) -> FoundTv(host, location?.let(::friendlyName) ?: "LG TV", ids[host]) }
     }
 
 /** Reads the TV's name (e.g. "[LG] webOS TV OLED65C14LB") from its UPnP description. */

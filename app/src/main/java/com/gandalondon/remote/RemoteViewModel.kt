@@ -1,6 +1,9 @@
 package com.gandalondon.remote
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gandalondon.remote.tv.Choice
@@ -88,7 +91,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
                         attempt++
                         retryJob = launch {
                             delay(wait)
-                            _host.value?.let { client.connect(it) }
+                            connectKnown()
                         }
                     }
                 }
@@ -168,7 +171,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
             repeat(12) { i ->
                 if (pending != Power.TurningOn) return@launch
                 if (client.conn.value != Conn.Connected) {
-                    if (i % 3 == 0 && macs.isNotEmpty()) wakeOnLan(macs, _host.value)
+                    if (i % 3 == 0 && macs.isNotEmpty()) wakeOnLan(macs, store.hosts)
                     if (client.conn.value !is Conn.Connecting) retryNow()
                 }
                 delay(2_000)
@@ -188,7 +191,75 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onStart() {
         visible = true
-        _host.value?.let { client.connect(it) }
+        connectKnown()
+    }
+
+    /**
+     * Try every address the TV has answered at. If none work (the phone is
+     * on a different Wi-Fi network, or the router gave the TV a new address),
+     * search the network for this same TV and connect to it there, keeping
+     * the pairing: no Accept prompt, no setup.
+     */
+    private fun connectKnown() {
+        if (store.host == null) return
+        client.connect(store.hosts)
+    }
+
+    private var lastRediscovery = 0L
+
+    private fun rediscover(force: Boolean = false) {
+        if (store.host == null) return
+        val now = System.currentTimeMillis()
+        if (!force && now - lastRediscovery < 20_000) return
+        lastRediscovery = now
+        viewModelScope.launch {
+            val tvs = runCatching { discoverTvs(getApplication()) }.getOrDefault(emptyList())
+            val id = store.tvId
+            // Same TV by its own ID; with no ID saved yet, any LG TV here (the
+            // pinned certificate still refuses a different TV).
+            val mine = tvs.filter { id == null || it.id == null || it.id == id }
+            if (mine.isEmpty()) return@launch
+            mine.firstOrNull { it.id != null }?.let { if (store.tvId == null) store.tvId = it.id }
+            val known = store.hosts
+            val fresh = mine.map { it.host }.filter { it !in known }
+            if (fresh.isNotEmpty() || client.conn.value != Conn.Connected) {
+                store.hosts = mine.map { it.host } + known
+                if (client.conn.value != Conn.Connected) connectKnown()
+            }
+        }
+    }
+
+    /** Reconnect as soon as the phone joins another network. */
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) = onNetworkChanged()
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = Unit
+        override fun onLost(network: Network) = Unit
+    }
+
+    private fun onNetworkChanged() {
+        viewModelScope.launch {
+            if (!visible) return@launch
+            delay(1_000) // let the new network settle
+            connectKnown()
+            rediscover(force = true)
+        }
+    }
+
+    init {
+        runCatching {
+            getApplication<Application>().getSystemService(ConnectivityManager::class.java)
+                .registerDefaultNetworkCallback(networkCallback)
+        }
+        // Keep the shown address and the TV's ID current once connected.
+        viewModelScope.launch {
+            client.conn.collect { state ->
+                if (state == Conn.Connected) {
+                    _host.value = store.host
+                    if (store.tvId == null) rediscover(force = true)
+                }
+                if (state is Conn.Failed && state.reason == Reason.Unreachable && visible) rediscover()
+            }
+        }
     }
 
     fun onStop() {
@@ -198,7 +269,8 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun retryNow() {
-        _host.value?.let { client.connect(it) }
+        connectKnown()
+        rediscover(force = true)
     }
 
     // region setup
@@ -213,12 +285,22 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun pair(host: String, name: String?) {
-        store.host = host.trim()
-        store.tvName = name
-        _host.value = store.host
-        _tvName.value = name
-        store.clearPairing()
-        client.connect(store.host!!)
+        val h = host.trim()
+        val id = _found.value.firstOrNull { it.host == h }?.id
+        // Picking the same TV again (for example from the other Wi-Fi network)
+        // keeps the pairing; only a different TV starts over.
+        val sameTv = store.clientKey != null &&
+            ((id != null && id == store.tvId) || h in store.hosts || (id != null && store.tvId == null))
+        if (!sameTv) {
+            store.clearPairing()
+            store.hosts = emptyList()
+            store.tvId = id
+        }
+        store.rememberHost(h)
+        store.tvName = name ?: store.tvName
+        _host.value = h
+        _tvName.value = store.tvName
+        connectKnown()
     }
 
     fun pairAgain() {
@@ -329,6 +411,10 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     // endregion
 
     override fun onCleared() {
+        runCatching {
+            getApplication<Application>().getSystemService(ConnectivityManager::class.java)
+                .unregisterNetworkCallback(networkCallback)
+        }
         client.disconnect()
     }
 }
