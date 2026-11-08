@@ -38,7 +38,9 @@ The app reads the TV's own input names and matches them: "PS5" or "PlayStation" 
 
 ## More than one Wi-Fi network
 
-Hugin remembers every address the TV has answered at and tries them all. When the phone changes network it reconnects by itself, and if the TV is not at a known address it searches for the same TV (by its own ID) and connects without asking to pair again. This works as long as the phone can reach the TV from that network: if one network is a guest network or a separate router that cannot see the TV, nothing on the phone can get through.
+Hugin remembers every address the TV has answered at, reconnects by itself when the phone changes network, and finds the same TV again without pairing.
+
+At home the TV is on HemDAO (a Google Wifi mesh plugged into the main router, Bifrost). HemDAO is its own network, so from Bifrost's Wi-Fi the TV is hidden. To reach it from Bifrost, HemDAO forwards the remote's port to the TV: Google Home app > Wi-Fi > Settings > Advanced networking > Port management > Add > the TV > port 3001, TCP. Hugin then finds the TV through HemDAO's address on Bifrost by itself (it checks the TV's certificate, so nothing else can pose as it). Turning the TV on from Bifrost does not work; everything else does.
 
 ## Mute
 

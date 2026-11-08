@@ -14,6 +14,7 @@ import com.gandalondon.remote.tv.Store
 import com.gandalondon.remote.tv.Target
 import com.gandalondon.remote.tv.WebOsClient
 import com.gandalondon.remote.tv.discoverTvs
+import com.gandalondon.remote.tv.probeForTv
 import com.gandalondon.remote.tv.resolve
 import com.gandalondon.remote.tv.wakeOnLan
 import kotlinx.coroutines.Job
@@ -219,7 +220,16 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
             // Same TV by its own ID; with no ID saved yet, any LG TV here (the
             // pinned certificate still refuses a different TV).
             val mine = tvs.filter { id == null || it.id == null || it.id == id }
-            if (mine.isEmpty()) return@launch
+            if (mine.isEmpty()) {
+                // Not on this network: look for it through the other router's port forward.
+                if (client.conn.value == Conn.Connected) return@launch
+                val via = runCatching { probeForTv(getApplication(), store.certPin) }.getOrNull()
+                if (via != null && via !in store.hosts) {
+                    store.hosts = listOf(via) + store.hosts
+                    connectKnown()
+                }
+                return@launch
+            }
             mine.firstOrNull { it.id != null }?.let { if (store.tvId == null) store.tvId = it.id }
             val known = store.hosts
             val fresh = mine.map { it.host }.filter { it !in known }
